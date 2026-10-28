@@ -4,7 +4,7 @@
 
 ![robo_prober on a real arm: discover the pins, identify each servo, find its safe range of motion](docs/demo.gif)
 
-*Real run on a 3D-printed arm, sped up. [Watch the full 50-second demo](docs/demo.mp4).*
+*Real run on a 3D-printed arm (ESP32-S3, two hobby servos). [Watch the full 50-second demo](docs/demo.mp4).*
 
 | 1. Discover | 2. Identify | 3. Range of motion | 4. Export |
 |---|---|---|---|
