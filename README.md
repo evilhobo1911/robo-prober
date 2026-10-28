@@ -1,16 +1,18 @@
-# robo_prober
+<p align="center"><img src="docs/banner.png" width="100%" alt="Robo Prober: plug in a robot it has never seen. It finds every motor, measures each joint's safe range and saves a ready-to-run robot map"></p>
 
-**Plug in a servo robot you know nothing about. robo_prober finds its controller and servos, works out which joint is which, measures how far each one can safely move, and saves it all as a robot map.** With a 3D scan of the robot it also exports a URDF model you can load in a simulator.
+**What it is.** Software that figures out an unknown robot on its own: a desktop app, command-line tool and Python library, plus firmware for the robot's controller board.
 
-![robo_prober on a real arm: discover the pins, identify each servo, find its safe range of motion](docs/demo.gif)
+**What it does.** Plug the robot into your computer. robo_prober finds the controller and its motors, works out which joint is which, measures how far each one can safely move, and saves it all as a robot map. With a 3D scan of the robot it also exports a URDF model a simulator can load.
+
+**Why it matters.** Bringing up a robot you didn't wire yourself usually means guessing which channel drives which joint and sending test pulses that can slam a motor into its end stop. robo_prober replaces the guessing with small, slow, approved moves and writes down the answer. It runs on Linux, Windows and macOS and talks to ESP32 boards (ESP32, S2, S3, C3, C6) or a Raspberry Pi / Jetson agent.
+
+<p align="center"><img src="docs/demo.gif" width="100%" alt="robo_prober on a real arm: discover the pins, identify each servo, find its safe range of motion"></p>
 
 *Real run on a 3D-printed arm (ESP32-S3, two hobby servos). [Watch the full 50-second demo](docs/demo.mp4).*
 
 | 1. Discover | 2. Identify | 3. Range of motion | 4. Export |
 |---|---|---|---|
 | Finds the board on USB, installs its test firmware (after backing up the old one) and checks every pin. Nothing moves. | Wiggles one pin at a time, slowly. You say what moved and name it: "shoulder", "yaw". | Slide each joint to its safe ends. From then on the controller itself refuses anything outside them. | A validated hardware map (JSON) of every joint, pin and safe range, plus a URDF when you add a 3D scan. |
-
-**Why it matters:** bringing up a robot you didn't wire yourself usually means guessing which channel drives which joint and sending test pulses that can slam a servo into its end stop. robo_prober replaces the guessing with small, slow, approved moves and writes down the answer. It runs on Linux, Windows and macOS as a desktop window, a command-line tool or a Python library, and talks to ESP32 boards (ESP32, S2, S3, C3, C6) or a Raspberry Pi / Jetson agent.
 
 > **Keep your hand on the power cutoff the first time anything moves.**
 
@@ -352,7 +354,8 @@ Platform notes:
 
 - The built-in emulator runs behind a real pseudo terminal on Linux and macOS
   (exercising the serial stack) and in-process on Windows. The pseudo-terminal
-  tests are skipped on Windows; everything else runs everywhere.
+  tests and the Linux single-board-computer agent tests run on Linux and macOS;
+  everything else runs everywhere.
 - The ROM window needs Tk. It ships with the python.org installers for Windows
   and macOS; on Linux install your distribution's `python3-tk` (robo_prober.py
   tells you the exact command).
