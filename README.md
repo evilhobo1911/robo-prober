@@ -1,89 +1,35 @@
-# robo-prober
+# robo_prober
 
-![robo-prober finding and ranging the servos of a real arm](docs/demo.gif)
+**Plug in a servo robot you know nothing about. robo_prober finds its controller and servos, works out which joint is which, measures how far each one can safely move, and saves it all as a robot map.** With a 3D scan of the robot it also exports a URDF model you can load in a simulator.
 
-*Real run, 8x speed: Discover, Identify (buzz each pin, name what moved), range of motion. [Full video](docs/demo.mp4).*
+![robo_prober on a real arm: discover the pins, identify each servo, find its safe range of motion](docs/demo.gif)
 
-**To use:** `cd robo_prober`, then run `python robo_prober.py`
+*Real run on a 3D-printed arm, sped up. [Watch the full 50-second demo](docs/demo.mp4).*
 
-It checks what it needs, asks before installing anything (Y/n), or says it's good to go
-and starts. Linux, Windows and macOS. (`python3` on systems without a `python` command.)
+| 1. Discover | 2. Identify | 3. Range of motion | 4. Export |
+|---|---|---|---|
+| Finds the board on USB, installs its test firmware (after backing up the old one) and checks every pin. Nothing moves. | Wiggles one pin at a time, slowly. You say what moved and name it: "shoulder", "yaw". | Slide each joint to its safe ends. From then on the controller itself refuses anything outside them. | A validated hardware map (JSON) of every joint, pin and safe range, plus a URDF when you add a 3D scan. |
 
-Find the robot controller on your USB bus, probe its servos only within limits
-you've approved, find each servo's safe range of motion by hand, and export
-what you learned as a validated hardware map or URDF.
+**Why it matters:** bringing up a robot you didn't wire yourself usually means guessing which channel drives which joint and sending test pulses that can slam a servo into its end stop. robo_prober replaces the guessing with small, slow, approved moves and writes down the answer. It runs on Linux, Windows and macOS as a desktop window, a command-line tool or a Python library, and talks to ESP32 boards (ESP32, S2, S3, C3, C6) or a Raspberry Pi / Jetson agent.
 
-[![CI](https://github.com/tardigraderesearch/robo_prober/actions/workflows/ci.yml/badge.svg)](https://github.com/tardigraderesearch/robo_prober/actions/workflows/ci.yml)
+> **Keep your hand on the power cutoff the first time anything moves.**
 
-## Hardware test status
+## Architecture
 
-| Passed on real hardware (ESP32-S3, 2026-10-22) | Physical test pending |
-|---|---|
-| Pin survey (driven / pulled / floating), no PCA9685 needed | ESP32, S2, C3, C6 (builds and simulator only) |
-| Identify: pins in order, quick buzz, Y/N, naming, next pin buzzes automatically; boot pins left out | Raspberry Pi 4 / 5 / Zero 2 W and Jetson Orin agent (emulated GPIO only) |
-| Range of motion (ROM 1 / ROM 2, relative sliders, narrow/widen) | Firmware backup and restore from the app |
-| E-stop latch, disarm, map save | PCA9685 discovery, LED blink, button watch, I2C scan on hardware |
-| Firmware check on Connect (background) and install from the app: 0.3.0 → 0.3.1 | "Set all servos to 0" |
-| | Bench tab (step 3): drag servos on, group slider with Invert, buzz, Use as start |
-| | Identify: "Moved one way only / spins" (key O) marks a servo faulty |
-| | Identify: servo type (type-ahead or 20 questions) and its safe starting band |
-| | Firmware 0.3.1: PCA9685 pins cached in NVS (no PCA9685 on the test arm) |
+![Architecture: the desktop app talks ROBOPROBE/1 over USB serial to the ESP32 firmware, which drives the servos and enforces the limits](docs/architecture.png)
 
-Everything in the right column is covered by automated tests but has not yet run on a physical board.
-
-## Who it's for
-
-Hobbyists, students and researchers who have a servo-driven robot (an arm, a
-legged robot, a pan/tilt rig) on an ESP32 or similar board and want to work out
-which channel moves which joint, and how far each one can safely go, without
-guessing. If you'd rather not send random PWM to an unknown board and hope
-nothing breaks, this tool does the work one small, approved, slow step at a time.
-
-It runs on Linux, Windows and macOS, as a command-line tool, a small desktop
-window, or a Python library other programs can import.
-
-## Safety model
-
-robo-prober is **fail-closed**. If something isn't explicitly allowed, it doesn't
-happen.
-
-- **Discovery is read-only.** `discover` lists serial ports without opening them.
-- **A USB ID is only a hint.** A VID/PID usually identifies a USB-to-UART bridge
-  chip, not the board behind it. You pick the exact board yourself.
-- **Identification needs consent.** `identify` resets the chip (via `esptool`),
-  so it only runs when you pass `--consent-controller-identification YES_RESET_ALLOWED`.
-- **A pinout is not a permission.** The board catalog describes pins, and every
-  pin record denies probing, reading, writing and PWM. The firmware only *reads*
-  pins until you arm; then it drives one pin at a time, when you press Wiggle or
-  Blink, never a pin the catalog reserves (flash, USB, the host serial link) and
-  never a pin the survey finds driven by something else.
-- **Arming is manual.** Nothing moves until you arm with a session token and
-  confirm that a physical power cutoff is within reach.
-- **The firmware enforces limits too.** Outputs are off at boot. Each channel
-  has a pulse band (default a conservative 1400–1600 µs); anything outside it is
-  refused by the controller itself, even if the host asks.
-- **Everything moves slowly.** Moves are slew-limited on the host and again in
-  the firmware, so a servo follows a target instead of jumping to it.
-- **Silence stops everything.** While armed, the host sends a heartbeat. If the
-  host crashes, hangs or is unplugged, the firmware watchdog releases every
-  output within a second.
-- **Stop is always available.** `DISARM`, `STOP` and a latching `ESTOP` (plus an
-  optional hardware e-stop input) release every output. The window has an
-  always-visible E-STOP button, and Esc does the same.
-- **Any doubt stops the session.** A malformed reply, timeout or mismatched
-  acknowledgement aborts the session and sends `STOP`. Bad input to the
-  firmware is rejected and never moves anything. There are no "recovery" moves.
-- **People decide, not heuristics.** Range of motion comes from where *you*
-  stop the servo. A joint assignment only goes into the map once a person
-  confirms it.
-
-This is software. Keep a hand on the power cutoff the first time anything moves.
+The limits are enforced twice: by the app, and again on the board (pulse band per joint, slew limit, a watchdog that releases every output if the computer goes quiet, and a latching E-STOP). Source: [docs/architecture.drawio](docs/architecture.drawio).
 
 ## Quickstart
 
 ### 1. Install
 
-Clone or download the repository, then `python robo_prober.py`. On the first run it
+```bash
+git clone https://github.com/tardigraderesearch/robo_prober && cd robo_prober
+python robo_prober.py          # python3 on systems without a python command
+```
+
+On the first run it
 asks before creating a private `.venv` next to itself and installing the libraries into
 it (nothing system-wide); after that it says it's good to go and opens the
 range-of-motion window. Any robo-prober command can follow it, e.g.
@@ -396,7 +342,7 @@ writing. `validate-map` checks the schema, the joint/channel uniqueness, any
 | Operating systems | Linux (any distribution), Windows 10/11, macOS. CI runs the tests on all three with Python 3.11 and 3.12. |
 | Controller | Anything that speaks `ROBOPROBE/1` over serial. Reference firmware: ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C6 (all build). |
 | Servo outputs | PCA9685-style 16-channel servo boards (channels 0–15) and servos straight on GPIO pins (channel 100+N, LEDC PWM), 500–2500 µs. |
-| Verified on hardware | ESP32-S3, 2026-10-22: a 3-servo arm with servos straight on GPIO, no prior wiring info. Discover, Identify (buzz + Y/N + names), range of motion and map save passed. Other boards and features: see *Hardware test status* below. |
+| Tested on a real robot | ESP32-S3 driving a 3-servo arm with servos straight on GPIO, no wiring info given up front: Discover, Identify, range of motion and map save (the demo above). |
 | Chip identification | ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C6 (via `esptool`). |
 | Board catalog | ESP32 SoC references, ESP32-DevKitC V4, ESP32-S3-DevKitC-1, Raspberry Pi Pico / Pico W, Arduino Uno R3. The firmware's pin tables are generated from it (`python -m robo_prober.firmware_pins`). |
 | USB bridges recognized | CP210x, CH340, CH343, FT232, Espressif native USB, Arduino Uno, Pico. |
@@ -535,26 +481,6 @@ robo-prober model articulate --config my-confirmed-model.json --out urdf
 No scan is bundled. `python examples/build_synthetic_articulation.py` builds a
 synthetic two-link arm and runs the whole pipeline. See
 [docs/scan-segmentation.md](docs/scan-segmentation.md) for the config format.
-
-## Limitations
-
-- Only one motion route exists (PCA9685-style servo channels). No GPIO, no
-  stepper or smart-servo buses.
-- robo-prober never decides a limit on its own. ROM marks are where an operator
-  stopped the servo, and neutral positions still come from you.
-- The very first pulse on a channel still moves the servo from an unknown
-  position to the start pulse. Saved last positions keep that move small, but
-  a servo that was pushed by hand or by gravity while unpowered will jump back.
-- There is no position feedback: the firmware knows the pulse it outputs, not
-  where the horn actually is. A stalled or overloaded servo looks the same as
-  one that arrived.
-- The v0.2 firmware is compiled for ESP32 and ESP32-S3 in CI and its protocol
-  and safety core is tested on the desktop, but it has not yet been run
-  against physical servos for this release. Bench-test it with the power
-  cutoff in hand before trusting it.
-- Camera observations are image-space only (no calibration, no world-frame pose).
-- URDF export is visual and kinematic only: no inertia, collision or dynamics.
-- A successful demo proves the software path, not that your hardware is safe to move.
 
 ## License
 
