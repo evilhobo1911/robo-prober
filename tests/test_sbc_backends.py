@@ -16,6 +16,9 @@ from robo_prober.sbc.backends import (
 from robo_prober.sbc.boards import pin_map
 from robo_prober.sbc.i2c import SMBusScanner
 
+# The SBC agent targets Linux single-board computers (gpiochip, SMBus, POSIX streams).
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="SBC agent is Linux-only; Windows paths and sockets differ")
+
 
 class Direction(Enum):
     INPUT = 1
@@ -287,7 +290,7 @@ def test_smbus_read_only_scan_excludes_reserved_and_claimed_addresses(monkeypatc
             if address == 0x41:
                 raise OSError(errno.EBUSY, "kernel device")
             if address not in (0x40, 0x68):
-                raise OSError(errno.EREMOTEIO, "NACK")
+                raise OSError(getattr(errno, "EREMOTEIO", 121), "NACK")
             return 0
     monkeypatch.setitem(sys.modules, "smbus2", SimpleNamespace(SMBus=Bus))
     assert SMBusScanner().scan(7) == [0x40, 0x68]

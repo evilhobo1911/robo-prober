@@ -76,11 +76,27 @@ def test_transport_stops_on_malformed_ack():
 def test_transport_timeout_without_emulator_response():
     emulator = PtyReferenceEmulator()
     port = emulator.open()
+    stop = threading.Event()
+
+    def swallow():
+        # Read and discard what the host sends, never reply. Without a reader, macOS
+        # blocks the host's flush() (tcdrain) forever on the unread pty output.
+        import os
+        import select
+        while not stop.is_set():
+            ready, _, _ = select.select([emulator.master_fd], [], [], 0.05)
+            if ready:
+                os.read(emulator.master_fd, 4096)
+
+    thread = threading.Thread(target=swallow, daemon=True)
+    thread.start()
     try:
         with SerialProtocolTransport(port, timeout_s=0.1) as transport:
             with pytest.raises(TransportTimeout):
                 transport.hello()
     finally:
+        stop.set()
+        thread.join(timeout=1.0)
         emulator.close()
 
 

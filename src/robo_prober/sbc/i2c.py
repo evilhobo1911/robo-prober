@@ -6,6 +6,9 @@ sends no register address and leaves claimed slave addresses alone.
 """
 import errno
 
+# Linux-only errno (I2C NACK); absent on macOS/Windows, where this agent never runs.
+EREMOTEIO = getattr(errno, "EREMOTEIO", 121)
+
 
 class SMBusScanner:
     def scan(self, bus: int) -> list[int]:
@@ -18,7 +21,7 @@ class SMBusScanner:
                 try:
                     device.read_byte(address)
                 except OSError as error:
-                    if error.errno not in (errno.ENXIO, errno.EREMOTEIO, errno.EIO, errno.EBUSY):
+                    if error.errno not in (errno.ENXIO, EREMOTEIO, errno.EIO, errno.EBUSY):
                         # Unsupported quick reads must not look like an empty bus.
                         raise
                 else:

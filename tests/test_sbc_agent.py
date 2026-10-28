@@ -14,6 +14,9 @@ from robo_prober.sbc.boards import Board, detect_board
 from robo_prober.sbc.server import LineFramer, serve_stream, serve_tcp
 from robo_prober.transport import InProcessEmulatorConnection, SerialProtocolTransport, parse_response
 
+# The SBC agent targets Linux single-board computers (gpiochip, SMBus, POSIX streams).
+pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="SBC agent is Linux-only; Windows paths and sockets differ")
+
 ARM = "ARM token=t cutoff=confirmed"
 PROBE = "PROBE pin=4 mode=servo start_us=1500 token=t"
 
